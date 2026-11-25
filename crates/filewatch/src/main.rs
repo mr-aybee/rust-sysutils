@@ -179,7 +179,7 @@ fn finish(
     if cfg!(target_os = "macos") {
         // Allow for FSEvents delivery latency when deciding whether a file is new
         let since = window_start
-            .checked_sub(debounce + Duration::from_secs(1))
+            .checked_sub(debounce + Duration::from_millis(250))
             .unwrap_or(UNIX_EPOCH);
 
         return batch.finish_by_state(since, |p| {

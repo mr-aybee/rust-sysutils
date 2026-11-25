@@ -23,7 +23,8 @@ fn watch_while(args: &[&str], actions: impl FnOnce()) -> String {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    thread::sleep(Duration::from_millis(400));
+    // Let the watcher register (FSEvents on macOS needs longer than inotify)
+    thread::sleep(Duration::from_millis(1000));
 
     actions();
 
@@ -187,7 +188,8 @@ fn queued_runs_never_overlap_and_coalesce() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    thread::sleep(Duration::from_millis(400));
+    // Let the watcher register (FSEvents on macOS needs longer than inotify)
+    thread::sleep(Duration::from_millis(1000));
 
     // Three separate batches while the first run is still in progress
     for i in 0..3 {
@@ -224,7 +226,8 @@ fn restart_policy_kills_running_command() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    thread::sleep(Duration::from_millis(400));
+    // Let the watcher register (FSEvents on macOS needs longer than inotify)
+    thread::sleep(Duration::from_millis(1000));
 
     fs::write(watched.join("a"), "x").unwrap();
     thread::sleep(Duration::from_millis(500));
@@ -266,7 +269,8 @@ fn latency_is_bounded_by_debounce() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    thread::sleep(Duration::from_millis(400));
+    // Let the watcher register (FSEvents on macOS needs longer than inotify)
+    thread::sleep(Duration::from_millis(1000));
 
     let mut stdout = child.stdout.take().unwrap();
     let start = Instant::now();
