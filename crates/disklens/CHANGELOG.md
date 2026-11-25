@@ -4,6 +4,11 @@ All notable changes to this crate are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the crate uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Summary line now says "symlink(s) counted but not followed" to reflect that a link's own size is included in totals.
+
 ## [0.1.0] - 2026-11-25
 
 ### Added

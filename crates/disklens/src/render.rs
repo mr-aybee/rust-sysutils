@@ -77,7 +77,7 @@ pub fn render(r: &ScanResult, v: &View) -> String {
     }
     if r.symlinks_skipped > 0 {
         notes.push(format!(
-            "{} symlink(s) not followed",
+            "{} symlink(s) counted but not followed",
             group(r.symlinks_skipped)
         ));
     }
