@@ -3,7 +3,6 @@
 
 use std::fs;
 use std::io::Read;
-use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -166,7 +165,7 @@ fn exec_receives_changed_paths_on_stdin_and_once_exits() {
 
 /// Count how many times a command ran by having it append to a log file.
 #[cfg(unix)]
-fn run_count(log: &Path) -> usize {
+fn run_count(log: &std::path::Path) -> usize {
     fs::read_to_string(log)
         .map(|s| s.lines().count())
         .unwrap_or(0)
