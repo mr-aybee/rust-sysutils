@@ -1,8 +1,9 @@
 //! Hashing throughput microbenchmarks (in-memory, no I/O).
 
+use std::hint::black_box;
+
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use filehash::algo::{Algorithm, digest};
-use std::hint::black_box;
 
 fn bench(c: &mut Criterion) {
     let data = vec![0xA5u8; 1 << 20];

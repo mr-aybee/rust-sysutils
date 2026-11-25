@@ -5,12 +5,13 @@
 //! `workers × buffer_size` regardless of file sizes or counts. Results are
 //! written into their input slot, which keeps output order deterministic.
 
-use crate::algo::Algorithm;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::algo::Algorithm;
 
 pub const DEFAULT_BUFFER: usize = 1 << 20;
 
@@ -112,8 +113,9 @@ pub fn hash_all<P: AsRef<Path> + Sync>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Write;
+
+    use super::*;
 
     #[test]
     fn parallel_matches_sequential_and_keeps_order() {

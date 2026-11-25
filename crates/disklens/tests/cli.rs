@@ -1,9 +1,10 @@
 //! End-to-end CLI tests on temporary directory trees.
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
+use std::fs;
+
 use assert_cmd::Command;
 use predicates::prelude::*;
-use std::fs;
 
 fn disklens() -> Command {
     Command::cargo_bin("disklens").unwrap()

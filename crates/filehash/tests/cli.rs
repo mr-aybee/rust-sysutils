@@ -1,10 +1,11 @@
 //! End-to-end CLI tests on temporary directory trees.
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
 use std::fs;
 use std::path::Path;
+
+use assert_cmd::Command;
+use predicates::prelude::*;
 
 fn filehash(dir: &Path) -> Command {
     let mut c = Command::cargo_bin("filehash").unwrap();

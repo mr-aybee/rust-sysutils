@@ -1,10 +1,11 @@
+use std::io::Write;
+use std::path::PathBuf;
+use std::process::ExitCode;
+
 use clap::Parser;
 use disklens::glob::Pattern;
 use disklens::render::{self, View};
 use disklens::scan::{self, Options};
-use std::io::Write;
-use std::path::PathBuf;
-use std::process::ExitCode;
 
 const EXIT_OK: u8 = 0;
 /// Scan completed but some entries could not be read (like `du`).

@@ -1,10 +1,11 @@
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
 use clap::{Parser, Subcommand};
 use filehash::algo::Algorithm;
 use filehash::{exit, manifest, pool, walk};
 use serde::Serialize;
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
 
 #[derive(Debug, Parser)]
 #[command(

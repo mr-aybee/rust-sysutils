@@ -5,14 +5,16 @@
 //! largest files are tracked in bounded per-directory lists merged upward. Memory
 //! therefore grows with the number of directories, not files.
 
-use crate::glob::Pattern;
-use rayon::prelude::*;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::{self, Metadata};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use rayon::prelude::*;
+use serde::Serialize;
+
+use crate::glob::Pattern;
 
 /// Maximum number of individual error messages retained (all are counted).
 pub const MAX_ERRORS_KEPT: usize = 100;
