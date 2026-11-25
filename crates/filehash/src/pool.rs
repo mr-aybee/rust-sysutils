@@ -31,6 +31,7 @@ pub fn hash_file(path: &Path, algo: Algorithm, buf: &mut [u8]) -> io::Result<(St
     let mut file = File::open(path)?;
     let mut hasher = algo.hasher();
     let mut total = 0u64;
+
     loop {
         let n = match file.read(buf) {
             Ok(0) => break,
@@ -38,9 +39,11 @@ pub fn hash_file(path: &Path, algo: Algorithm, buf: &mut [u8]) -> io::Result<(St
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         };
+
         hasher.update(&buf[..n]);
         total += n as u64;
     }
+
     Ok((hasher.finalize_hex(), total))
 }
 
@@ -71,6 +74,7 @@ pub fn hash_all<P: AsRef<Path> + Sync>(
         for _ in 0..workers {
             s.spawn(|| {
                 let mut buf = vec![0u8; buffer_size.max(4096)];
+
                 loop {
                     let i = next.fetch_add(1, Ordering::Relaxed);
                     let Some(path) = paths.get(i) else { break };
@@ -78,13 +82,16 @@ pub fn hash_all<P: AsRef<Path> + Sync>(
                     let large = intra_file
                         && std::fs::metadata(path)
                             .is_ok_and(|m| m.is_file() && m.len() >= LARGE_FILE);
+
                     let r = if large {
                         hash_blake3_parallel(path)
                     } else {
                         hash_file(path, algo, &mut buf)
                     };
+
                     let r = r.map_err(|e| e.to_string());
                     on_done(i, &r);
+
                     if let Ok(mut slot) = slots[i].lock() {
                         *slot = Some(r);
                     }
@@ -112,12 +119,14 @@ mod tests {
     fn parallel_matches_sequential_and_keeps_order() {
         let dir = tempfile::tempdir().unwrap();
         let mut paths = Vec::new();
+
         for i in 0..50 {
             let p = dir.path().join(format!("f{i}"));
             let mut f = File::create(&p).unwrap();
             f.write_all(&vec![i as u8; i * 1000 + 1]).unwrap();
             paths.push(p);
         }
+
         paths.push(dir.path().join("missing"));
         let seq = hash_all(&paths, Algorithm::Blake3, 1, 4096, true, &|_, _| {});
         let par = hash_all(&paths, Algorithm::Blake3, 8, 4096, true, &|_, _| {});

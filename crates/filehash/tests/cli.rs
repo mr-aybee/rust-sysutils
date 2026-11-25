@@ -57,15 +57,19 @@ fn hash_is_sorted_deterministic_and_skips_hidden() {
 #[test]
 fn roundtrip_all_algorithms_and_formats() {
     let t = tree();
+
     for algo in ["sha256", "sha512", "blake3"] {
         for tag in [false, true] {
             let name = format!("{algo}{}.sums", if tag { "-tag" } else { "" });
             let mut cmd = filehash(t.path());
             cmd.args(["hash", "d", "-a", algo, "-o", &name]);
+
             if tag {
                 cmd.arg("--tag");
             }
+
             cmd.assert().code(0);
+
             // Untagged 64-hex manifests need the algorithm unless the name says it.
             filehash(t.path())
                 .args(["verify", &name])
@@ -195,6 +199,7 @@ fn errors_and_usage() {
 #[test]
 fn output_is_atomic_and_not_partial_on_error() {
     let t = tree();
+
     // Output into a non-existent directory fails cleanly, leaving nothing behind.
     filehash(t.path())
         .args(["hash", "d", "-o", "no/such/dir/sums"])
@@ -225,6 +230,7 @@ fn symlinks_not_followed_by_default_and_cycles_safe() {
         .code(0)
         .stdout(predicate::str::contains("d/link").not())
         .stderr(predicate::str::contains("2 symlink(s) skipped"));
+
     // Following links must terminate despite the cycle and include the linked file.
     filehash(t.path())
         .args(["hash", "d", "-L"])
@@ -241,9 +247,11 @@ fn unreadable_file_is_an_error_not_a_match() {
     let t = tree();
     let p = t.path().join("d/a.txt");
     fs::set_permissions(&p, fs::Permissions::from_mode(0o000)).unwrap();
+
     if fs::read(&p).is_ok() {
         return; // running as root: permissions are not enforced
     }
+
     filehash(t.path())
         .args(["hash", "d"])
         .assert()

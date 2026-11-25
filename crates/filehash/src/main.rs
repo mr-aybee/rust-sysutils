@@ -82,11 +82,13 @@ fn main() -> ExitCode {
             });
         }
     };
+
     let jobs = cli.jobs.map(usize::from).unwrap_or_else(|| {
         std::thread::available_parallelism()
             .map_or(4, |n| n.get())
             .min(64)
     });
+
     let code = match cli.command {
         Command::Hash {
             paths,
@@ -123,6 +125,7 @@ fn main() -> ExitCode {
             cli.quiet,
         ),
     };
+
     ExitCode::from(code)
 }
 
@@ -142,6 +145,7 @@ fn hash_stdin(algo: Algorithm) -> io::Result<(String, u64)> {
     let mut buf = vec![0u8; pool::DEFAULT_BUFFER];
     let mut stdin = io::stdin().lock();
     let mut total = 0u64;
+
     loop {
         let n = match stdin.read(&mut buf) {
             Ok(0) => break,
@@ -149,9 +153,11 @@ fn hash_stdin(algo: Algorithm) -> io::Result<(String, u64)> {
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         };
+
         h.update(&buf[..n]);
         total += n as u64;
     }
+
     Ok((h.finalize_hex(), total))
 }
 
@@ -175,9 +181,11 @@ fn write_atomic(path: &Path, data: &[u8]) -> io::Result<()> {
         f.sync_all()?;
         std::fs::rename(&tmp, path)
     })();
+
     if result.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
+
     result
 }
 
@@ -204,17 +212,21 @@ fn cmd_hash(
     let files: Vec<&Path> = walked.files.iter().map(|f| f.path.as_path()).collect();
     let mut results = pool::hash_all(&files, algo, jobs, pool::DEFAULT_BUFFER, mmap, &|_, _| {});
     let mut displays: Vec<String> = walked.files.iter().map(|f| f.display.clone()).collect();
+
     if stdin_requested {
         displays.push("-".into());
         results.push(hash_stdin(algo).map_err(|e| e.to_string()));
     }
 
     let mut failed = walked.errors.len();
+
     for (p, e) in &walked.errors {
         eprintln!("filehash: {p}: {e}");
     }
+
     let mut text = String::new();
     let mut json_items = Vec::with_capacity(results.len());
+
     for (display, r) in displays.iter().zip(&results) {
         match r {
             Ok((hex, size)) => {
@@ -233,6 +245,7 @@ fn cmd_hash(
             Err(e) => {
                 failed += 1;
                 eprintln!("filehash: {display}: {e}");
+
                 if json {
                     json_items.push(HashedJson {
                         path: display,
@@ -244,7 +257,9 @@ fn cmd_hash(
             }
         }
     }
+
     let ok = results.iter().filter(|r| r.is_ok()).count();
+
     if json {
         #[derive(Serialize)]
         struct Doc<'a> {
@@ -265,6 +280,7 @@ fn cmd_hash(
         };
         text = serde_json::to_string_pretty(&doc).unwrap_or_default() + "\n";
     }
+
     let written = match output {
         Some(p) => write_atomic(p, text.as_bytes())
             .map_err(|e| format!("cannot write {}: {e}", p.display())),
@@ -278,16 +294,19 @@ fn cmd_hash(
             }
         }
     };
+
     if let Err(e) = written {
         eprintln!("filehash: {e}");
         return exit::FAILURE;
     }
+
     if !quiet && (output.is_some() || walked.skipped_symlinks > 0 || failed > 0) {
         eprintln!(
             "filehash: {ok} file(s) hashed, {failed} error(s), {} symlink(s) skipped",
             walked.skipped_symlinks
         );
     }
+
     if failed > 0 { exit::FAILURE } else { exit::OK }
 }
 
@@ -295,6 +314,7 @@ fn cmd_hash(
 #[serde(rename_all = "lowercase")]
 enum Check {
     Ok,
+
     Failed,
     Missing,
     Error,
@@ -326,6 +346,7 @@ fn cmd_verify(
             eprintln!("filehash: cannot read stdin: {e}");
             return exit::USAGE;
         }
+
         s
     } else {
         match std::fs::read_to_string(manifest_path) {
@@ -336,6 +357,7 @@ fn cmd_verify(
             }
         }
     };
+
     let entries = match manifest::parse(&text) {
         Ok(e) => e,
         Err(e) => {
@@ -343,10 +365,12 @@ fn cmd_verify(
             return exit::USAGE;
         }
     };
+
     let name = manifest_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
+
     let default_algo = match manifest::infer_algorithm(explicit, &name, &entries) {
         Ok(a) => a,
         Err(e) => {
@@ -354,18 +378,22 @@ fn cmd_verify(
             return exit::USAGE;
         }
     };
+
     let base = root.map(Path::to_path_buf).unwrap_or_default();
     let resolved: Vec<PathBuf> = entries.iter().map(|e| base.join(&e.path)).collect();
 
     // Hash grouped by algorithm (manifests may mix BSD tags); usually a single group.
     let mut results: Vec<Option<pool::HashResult>> = vec![None; entries.len()];
+
     for algo in Algorithm::ALL {
         let idx: Vec<usize> = (0..entries.len())
             .filter(|&i| entries[i].algorithm.unwrap_or(default_algo) == algo)
             .collect();
+
         if idx.is_empty() {
             continue;
         }
+
         let paths: Vec<&Path> = idx.iter().map(|&i| resolved[i].as_path()).collect();
         for (k, r) in pool::hash_all(&paths, algo, jobs, pool::DEFAULT_BUFFER, mmap, &|_, _| {})
             .into_iter()
@@ -376,6 +404,7 @@ fn cmd_verify(
     }
 
     let mut checks: Vec<CheckJson> = Vec::with_capacity(entries.len());
+
     for ((entry, path), r) in entries.iter().zip(&resolved).zip(results) {
         let (status, detail) = match r {
             Some(Ok((hex, _))) if hex == entry.hex => (Check::Ok, None),
@@ -387,6 +416,7 @@ fn cmd_verify(
             Some(Err(e)) => (Check::Error, Some(e)),
             None => (Check::Error, Some("internal error".into())),
         };
+
         checks.push(CheckJson {
             path: entry.path.clone(),
             status,
@@ -400,11 +430,13 @@ fn cmd_verify(
         } else {
             base.clone()
         };
+
         let listed: std::collections::HashSet<String> = resolved
             .iter()
             .filter_map(|p| walk::display_path(&normalize(p)).ok())
             .collect();
         let manifest_norm = walk::display_path(&normalize(manifest_path)).ok();
+
         for f in walk::collect(&[walk_root], false, true).files {
             let norm = walk::display_path(&normalize(&f.path)).unwrap_or_default();
             if !listed.contains(&norm) && Some(&norm) != manifest_norm.as_ref() {
@@ -425,6 +457,7 @@ fn cmd_verify(
         count(Check::Error),
         count(Check::Extra),
     );
+
     if json {
         #[derive(Serialize)]
         struct Doc<'a> {
@@ -452,10 +485,12 @@ fn cmd_verify(
         );
     } else {
         let mut out = io::stdout().lock();
+
         for c in &checks {
             if quiet && c.status == Check::Ok {
                 continue;
             }
+
             let label = match c.status {
                 Check::Ok => "OK",
                 Check::Failed => "FAILED",
@@ -463,11 +498,13 @@ fn cmd_verify(
                 Check::Error => "ERROR",
                 Check::Extra => "EXTRA",
             };
+
             let _ = match &c.detail {
                 Some(d) => writeln!(out, "{label:<8} {}: {d}", c.path),
                 None => writeln!(out, "{label:<8} {}", c.path),
             };
         }
+
         let _ = writeln!(
             out,
             "--- {} checked: {ok} ok, {failed} failed, {missing} missing, {errors} error(s){}",
@@ -479,6 +516,7 @@ fn cmd_verify(
             }
         );
     }
+
     if failed + missing + errors + extra > 0 {
         exit::FAILURE
     } else {

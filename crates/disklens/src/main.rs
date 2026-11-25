@@ -61,6 +61,7 @@ fn main() -> ExitCode {
             return ExitCode::from(if e.use_stderr() { EXIT_USAGE } else { EXIT_OK });
         }
     };
+
     let exclude = match cli
         .exclude
         .iter()
@@ -73,6 +74,7 @@ fn main() -> ExitCode {
             return ExitCode::from(EXIT_USAGE);
         }
     };
+
     if let Some(j) = cli.jobs
         && let Err(e) = rayon::ThreadPoolBuilder::new()
             .num_threads(usize::from(j))
@@ -81,12 +83,14 @@ fn main() -> ExitCode {
         eprintln!("disklens: cannot configure thread pool: {e}");
         return ExitCode::from(EXIT_USAGE);
     }
+
     let opts = Options {
         one_file_system: cli.one_file_system,
         exclude,
         top_files: cli.top as usize,
         apparent: cli.apparent,
     };
+
     let mut result = match scan::scan(&cli.path, &opts) {
         Ok(r) => r,
         Err(e) => {
@@ -94,20 +98,24 @@ fn main() -> ExitCode {
             return ExitCode::from(EXIT_PARTIAL);
         }
     };
+
     let status = if result.errors > 0 {
         EXIT_PARTIAL
     } else {
         EXIT_OK
     };
+
     if cli.verbose || (!cli.json && result.errors > 0) {
         let shown = if cli.verbose {
             result.error_samples.len()
         } else {
             result.error_samples.len().min(5)
         };
+
         for e in &result.error_samples[..shown] {
             eprintln!("disklens: {}: {}", e.path, e.error);
         }
+
         if (result.errors as usize) > shown {
             eprintln!(
                 "disklens: … {} more error(s){}",
@@ -116,7 +124,9 @@ fn main() -> ExitCode {
             );
         }
     }
+
     scan::prune(&mut result.root, cli.depth);
+
     let text = if cli.json {
         #[derive(serde::Serialize)]
         struct Doc<'a> {
@@ -142,6 +152,7 @@ fn main() -> ExitCode {
             },
         )
     };
+
     let mut out = std::io::stdout().lock();
     if let Err(e) = out.write_all(text.as_bytes())
         && e.kind() != std::io::ErrorKind::BrokenPipe
@@ -149,5 +160,6 @@ fn main() -> ExitCode {
         eprintln!("disklens: cannot write output: {e}");
         return ExitCode::from(EXIT_PARTIAL);
     }
+
     ExitCode::from(status)
 }

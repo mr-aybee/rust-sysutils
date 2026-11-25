@@ -13,6 +13,7 @@ impl Pattern {
         if p.is_empty() {
             return Err("empty exclude pattern".into());
         }
+
         let trimmed = p.trim_end_matches('/');
         Ok(Self {
             pat: trimmed.chars().collect(),
@@ -27,6 +28,7 @@ impl Pattern {
         } else {
             name.chars().collect()
         };
+
         glob_match(&self.pat, &text)
     }
 }
@@ -35,22 +37,29 @@ fn glob_match(p: &[char], t: &[char]) -> bool {
     // Iterative backtracking matcher; `**` may cross '/', `*` may not.
     let (mut pi, mut ti) = (0usize, 0usize);
     let mut star: Option<(usize, usize, bool)> = None; // (pattern idx after star, text idx, crosses_slash)
+
     while ti < t.len() {
         if pi < p.len() && p[pi] == '*' {
             let double = pi + 1 < p.len() && p[pi + 1] == '*';
             pi += if double { 2 } else { 1 };
+
             // `**/` also matches zero directories.
             if double && pi < p.len() && p[pi] == '/' {
                 pi += 1;
             }
+
             star = Some((pi, ti, double));
+
             continue;
         }
+
         if pi < p.len() && (p[pi] == t[ti] || (p[pi] == '?' && t[ti] != '/')) {
             pi += 1;
             ti += 1;
+
             continue;
         }
+
         match star {
             Some((sp, st, crosses)) if crosses || t[st] != '/' => {
                 star = Some((sp, st + 1, crosses));
@@ -60,9 +69,11 @@ fn glob_match(p: &[char], t: &[char]) -> bool {
             _ => return false,
         }
     }
+
     while pi < p.len() && p[pi] == '*' {
         pi += 1;
     }
+
     pi == p.len()
 }
 
@@ -93,6 +104,7 @@ mod tests {
         assert!(m("a/*/c", "c", "a/b/c"));
         assert!(!m("a/*/c", "c", "a/b/x/c"));
         assert!(m("a/**/c", "c", "a/b/x/c"));
+
         // A trailing slash is ignored: "logs/" matches entries named logs.
         assert!(m("logs/", "logs", "x/logs"));
     }

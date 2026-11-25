@@ -22,9 +22,11 @@ fn tree() -> tempfile::TempDir {
     fs::create_dir_all(p.join("node_modules")).unwrap();
     fs::write(p.join("big/a.bin"), vec![1u8; 300 * 1024]).unwrap();
     fs::write(p.join("big/b.bin"), vec![1u8; 100 * 1024]).unwrap();
+
     for i in 0..3 {
         fs::write(p.join(format!("small/{i}.txt")), vec![1u8; 1024]).unwrap();
     }
+
     fs::write(p.join("node_modules/junk"), vec![1u8; 500 * 1024]).unwrap();
     fs::write(p.join("top.txt"), "0123456789").unwrap();
     t
@@ -132,11 +134,13 @@ fn errors_and_usage() {
 #[test]
 fn parallel_and_single_thread_agree() {
     let t = tree();
+
     for i in 0..20 {
         let d = t.path().join(format!("deep/{i}/x/y"));
         fs::create_dir_all(&d).unwrap();
         fs::write(d.join("f"), vec![0u8; i * 100]).unwrap();
     }
+
     let a = disklens()
         .arg(t.path())
         .args(["--json", "-j", "1", "-d", "5"])
@@ -166,10 +170,12 @@ fn unreadable_directory_is_partial_failure() {
     fs::create_dir(&locked).unwrap();
     fs::write(locked.join("secret"), "x").unwrap();
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+
     if fs::read_dir(&locked).is_ok() {
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
         return; // running as root
     }
+
     disklens()
         .arg(t.path())
         .assert()

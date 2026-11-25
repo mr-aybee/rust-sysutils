@@ -101,10 +101,12 @@ impl Hasher {
 pub fn hex(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);
+
     for b in bytes {
         s.push(DIGITS[usize::from(b >> 4)] as char);
         s.push(DIGITS[usize::from(b & 0xf)] as char);
     }
+
     s
 }
 
@@ -134,6 +136,7 @@ mod tests {
             digest(Algorithm::Sha512, b"")
                 .starts_with("cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce")
         );
+
         // "abc" (FIPS 180-2 example).
         assert_eq!(
             digest(Algorithm::Sha256, b"abc"),

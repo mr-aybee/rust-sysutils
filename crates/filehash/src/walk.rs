@@ -37,12 +37,14 @@ pub fn display_path(p: &Path) -> Result<String, String> {
 pub fn collect(inputs: &[PathBuf], follow_symlinks: bool, hidden: bool) -> Walk {
     let mut walk = Walk::default();
     let mut seen_dirs = HashSet::new();
+
     for input in inputs {
         let meta = if follow_symlinks {
             fs::metadata(input)
         } else {
             fs::symlink_metadata(input)
         };
+
         match meta {
             Err(e) => walk
                 .errors
@@ -65,6 +67,7 @@ pub fn collect(inputs: &[PathBuf], follow_symlinks: bool, hidden: bool) -> Walk 
             )),
         }
     }
+
     walk.files.sort_by(|a, b| a.display.cmp(&b.display));
     walk.files.dedup_by(|a, b| a.display == b.display);
     walk
@@ -95,6 +98,7 @@ fn walk_dir(dir: &Path, follow: bool, hidden: bool, seen: &mut HashSet<PathBuf>,
             }
         }
     }
+
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) => {
@@ -102,6 +106,7 @@ fn walk_dir(dir: &Path, follow: bool, hidden: bool, seen: &mut HashSet<PathBuf>,
             return;
         }
     };
+
     for entry in entries {
         let entry = match entry {
             Ok(e) => e,
@@ -110,10 +115,13 @@ fn walk_dir(dir: &Path, follow: bool, hidden: bool, seen: &mut HashSet<PathBuf>,
                 continue;
             }
         };
+
         let path = entry.path();
+
         if !hidden && entry.file_name().to_string_lossy().starts_with('.') {
             continue;
         }
+
         let ft = match entry.file_type() {
             Ok(t) => t,
             Err(e) => {
@@ -122,11 +130,13 @@ fn walk_dir(dir: &Path, follow: bool, hidden: bool, seen: &mut HashSet<PathBuf>,
                 continue;
             }
         };
+
         if ft.is_symlink() {
             if !follow {
                 walk.skipped_symlinks += 1;
                 continue;
             }
+
             match fs::metadata(&path) {
                 Ok(m) if m.is_dir() => walk_dir(&path, follow, hidden, seen, walk),
                 Ok(m) if m.is_file() => push_file(walk, &path),
@@ -140,6 +150,7 @@ fn walk_dir(dir: &Path, follow: bool, hidden: bool, seen: &mut HashSet<PathBuf>,
         } else if ft.is_file() {
             push_file(walk, &path);
         }
+
         // Sockets, FIFOs and devices are skipped silently: hashing them is not meaningful.
     }
 }
