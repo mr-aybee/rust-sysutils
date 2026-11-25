@@ -7,12 +7,16 @@ use std::path::{Path, PathBuf};
 /// A file to hash and the path string written to the manifest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileItem {
+    /// Path used to open the file.
     pub path: PathBuf,
+    /// `/`-separated path written to the manifest.
     pub display: String,
 }
 
+/// Result of expanding the inputs.
 #[derive(Debug, Default)]
 pub struct Walk {
+    /// Files to hash, sorted by manifest path.
     pub files: Vec<FileItem>,
     /// Paths that could not be read (permission denied, broken entries).
     pub errors: Vec<(String, String)>,

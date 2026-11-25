@@ -1,3 +1,5 @@
+//! FileHash command-line entry point.
+
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

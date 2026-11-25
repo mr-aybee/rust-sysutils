@@ -19,17 +19,23 @@ use crate::glob::Pattern;
 /// Maximum number of individual error messages retained (all are counted).
 pub const MAX_ERRORS_KEPT: usize = 100;
 
+/// Scan settings.
 #[derive(Debug, Clone)]
 pub struct Options {
+    /// Do not descend into other filesystems (Unix).
     pub one_file_system: bool,
+    /// Entries to skip.
     pub exclude: Vec<Pattern>,
+    /// Number of largest files to keep.
     pub top_files: usize,
     /// Rank files and directories by logical (apparent) size instead of allocated.
     pub apparent: bool,
 }
 
+/// Aggregated usage of one directory and everything below it.
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 pub struct DirNode {
+    /// Directory name (the root's display path for the root).
     pub name: String,
     /// Path relative to the scan root, `/`-separated ("" for the root).
     pub path: String,
@@ -37,13 +43,17 @@ pub struct DirNode {
     pub logical: u64,
     /// Bytes allocated on disk (equal to `logical` where the OS does not report blocks).
     pub allocated: u64,
+    /// Files below this directory (hard links counted once).
     pub files: u64,
+    /// Directories below this directory.
     pub dirs: u64,
+    /// Subdirectories, largest first.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<DirNode>,
 }
 
 impl DirNode {
+    /// Size by the chosen metric: apparent if `apparent`, otherwise on disk.
     pub fn size(&self, apparent: bool) -> u64 {
         if apparent {
             self.logical
@@ -53,10 +63,14 @@ impl DirNode {
     }
 }
 
+/// One of the largest files.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct FileEntry {
+    /// Path relative to the scan root, `/`-separated.
     pub path: String,
+    /// Apparent size in bytes.
     pub logical: u64,
+    /// Bytes allocated on disk.
     pub allocated: u64,
 }
 
@@ -70,24 +84,34 @@ impl FileEntry {
     }
 }
 
+/// Complete result of a scan.
 #[derive(Debug, Serialize)]
 pub struct ScanResult {
+    /// Root of the directory tree.
     pub root: DirNode,
+    /// Largest files by the chosen metric, largest first.
     pub largest_files: Vec<FileEntry>,
+    /// Entries that could not be read.
     pub errors: u64,
+    /// The first read errors (at most `MAX_ERRORS_KEPT`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub error_samples: Vec<ScanError>,
     /// Files skipped because another link to the same inode was already counted.
     pub hardlinks_deduplicated: u64,
+    /// Symbolic links counted but not followed.
     pub symlinks_skipped: u64,
+    /// Entries skipped by `--exclude`.
     pub excluded: u64,
     /// Whether allocated sizes come from the OS (false on Windows: allocated = logical).
     pub allocated_supported: bool,
 }
 
+/// An entry that could not be read.
 #[derive(Debug, Clone, Serialize)]
 pub struct ScanError {
+    /// Path that failed.
     pub path: String,
+    /// Error message from the OS.
     pub error: String,
 }
 

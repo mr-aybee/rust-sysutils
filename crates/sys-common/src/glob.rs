@@ -2,13 +2,16 @@
 //! including `/`), `?` (one character except `/`). Patterns without `/` match the
 //! entry name; patterns with `/` match the path relative to the scan root.
 
+/// A compiled exclude/include pattern.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pattern {
     pat: Vec<char>,
+    /// Whether the pattern contains `/` and so matches paths rather than names.
     pub path_match: bool,
 }
 
 impl Pattern {
+    /// Compile a pattern; a trailing `/` is ignored and empty patterns are rejected.
     pub fn new(p: &str) -> Result<Self, String> {
         if p.is_empty() {
             return Err("empty exclude pattern".into());

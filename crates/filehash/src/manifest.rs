@@ -6,9 +6,12 @@
 
 use crate::algo::Algorithm;
 
+/// One manifest line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// File path as written in the manifest (unescaped).
     pub path: String,
+    /// Expected digest, lower-case hex.
     pub hex: String,
     /// Algorithm named by the line itself (BSD tag format only).
     pub algorithm: Option<Algorithm>,

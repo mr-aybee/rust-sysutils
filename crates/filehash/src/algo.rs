@@ -3,15 +3,20 @@
 use std::fmt;
 use std::str::FromStr;
 
+/// Hash algorithm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Algorithm {
+    /// SHA-256 (64 hex digits).
     Sha256,
+    /// SHA-512 (128 hex digits).
     Sha512,
+    /// BLAKE3 (64 hex digits).
     Blake3,
 }
 
 impl Algorithm {
+    /// Every supported algorithm.
     pub const ALL: [Algorithm; 3] = [Algorithm::Sha256, Algorithm::Sha512, Algorithm::Blake3];
 
     /// Length of the hex digest.
@@ -31,12 +36,14 @@ impl Algorithm {
         }
     }
 
+    /// Algorithm for a BSD tag name such as `SHA256` (case-insensitive).
     pub fn from_tag(t: &str) -> Option<Self> {
         Self::ALL
             .into_iter()
             .find(|a| a.tag().eq_ignore_ascii_case(t))
     }
 
+    /// A fresh incremental hasher.
     pub fn hasher(self) -> Hasher {
         match self {
             Algorithm::Sha256 => Hasher::Ring(ring::digest::Context::new(&ring::digest::SHA256)),
@@ -75,11 +82,14 @@ impl FromStr for Algorithm {
 // so variant size differences do not matter; boxing would add an allocation per file.
 #[allow(clippy::large_enum_variant)]
 pub enum Hasher {
+    /// SHA-256 or SHA-512 via *ring*.
     Ring(ring::digest::Context),
+    /// BLAKE3.
     Blake3(blake3::Hasher),
 }
 
 impl Hasher {
+    /// Feed more input.
     #[inline]
     pub fn update(&mut self, data: &[u8]) {
         match self {
@@ -90,6 +100,7 @@ impl Hasher {
         }
     }
 
+    /// Finish and return the digest as lower-case hex.
     pub fn finalize_hex(self) -> String {
         match self {
             Hasher::Ring(h) => hex(h.finish().as_ref()),
@@ -98,6 +109,7 @@ impl Hasher {
     }
 }
 
+/// Lower-case hex encoding of `bytes`.
 pub fn hex(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);

@@ -38,13 +38,19 @@ fn group(n: u64) -> String {
     out
 }
 
+/// Display settings for the human-readable view.
 pub struct View {
+    /// Tree levels to show below the root.
     pub depth: usize,
+    /// Maximum subdirectories shown per directory.
     pub limit: usize,
+    /// Show apparent sizes instead of on-disk sizes.
     pub apparent: bool,
+    /// Print exact byte counts instead of binary units.
     pub raw: bool,
 }
 
+/// Render the tree, largest files and totals as text.
 pub fn render(r: &ScanResult, v: &View) -> String {
     let total = r.root.size(v.apparent).max(1);
     let mut out = format!(

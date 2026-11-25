@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::algo::Algorithm;
 
+/// Read buffer size per worker (1 MiB).
 pub const DEFAULT_BUFFER: usize = 1 << 20;
 
 /// Files at least this large may be hashed with BLAKE3's internal multithreading.
