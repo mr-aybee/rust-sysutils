@@ -122,11 +122,20 @@ fn transient_files_are_coalesced_away() {
 
     let ev = events(&out);
 
-    assert_eq!(
-        ev,
-        vec![("created".to_string(), "final.txt".to_string())],
+    // Every platform reports the final file and never reports the transient ones as created
+    assert!(
+        ev.contains(&("created".to_string(), "final.txt".to_string())),
         "{out}"
     );
+    assert!(
+        !ev.iter().any(|(k, p)| k == "created" && p != "final.txt"),
+        "{out}"
+    );
+
+    // Event-based platforms drop transient files entirely; macOS (state-based) reports them removed
+    if !cfg!(target_os = "macos") {
+        assert_eq!(ev.len(), 1, "{out}");
+    }
 }
 
 #[test]
@@ -155,6 +164,7 @@ fn exec_receives_changed_paths_on_stdin_and_once_exits() {
 }
 
 /// Count how many times a command ran by having it append to a log file.
+#[cfg(unix)]
 fn run_count(log: &Path) -> usize {
     fs::read_to_string(log)
         .map(|s| s.lines().count())

@@ -169,6 +169,27 @@ fn translate(event: Event) -> Option<Vec<Raw>> {
     Some(raws)
 }
 
+/// Resolve a batch into changes. macOS FSEvents accumulates flags per path, so event
+/// kinds are unreliable there; the batch is resolved from filesystem state instead.
+fn finish(
+    batch: Batch,
+    window_start: SystemTime,
+    debounce: Duration,
+) -> Vec<(PathBuf, ChangeKind)> {
+    if cfg!(target_os = "macos") {
+        // Allow for FSEvents delivery latency when deciding whether a file is new
+        let since = window_start
+            .checked_sub(debounce + Duration::from_secs(1))
+            .unwrap_or(UNIX_EPOCH);
+
+        return batch.finish_by_state(since, |p| {
+            std::fs::symlink_metadata(p).ok().map(|m| m.created().ok())
+        });
+    }
+
+    batch.finish()
+}
+
 /// Supervises the user command: at most one instance runs at a time.
 struct Runner {
     argv: Vec<String>,
@@ -431,6 +452,7 @@ fn main() -> ExitCode {
         };
 
         // Collect everything that arrives within the debounce window after the first event
+        let window_start = SystemTime::now();
         let deadline = Instant::now() + cli.debounce;
         let mut events = vec![first];
 
@@ -456,7 +478,12 @@ fn main() -> ExitCode {
 
         let mut changed: Vec<String> = Vec::new();
 
-        for (path, kind) in batch.finish() {
+        for (path, kind) in finish(batch, window_start, cli.debounce) {
+            // Events for a watched root itself (directory metadata) carry no useful change
+            if roots.contains(&path) {
+                continue;
+            }
+
             if !filter.accepts(&path) {
                 continue;
             }

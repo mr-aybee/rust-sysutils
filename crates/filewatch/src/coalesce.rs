@@ -1,7 +1,8 @@
 //! Coalescing raw filesystem events into one change per path per batch.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use serde::Serialize;
 
@@ -101,6 +102,33 @@ impl Batch {
             })
             .collect()
     }
+
+    /// Final changes decided by the filesystem's state instead of event kinds.
+    ///
+    /// For platforms whose events do not reliably say what happened (macOS FSEvents
+    /// accumulates flags per path). `state(path)` returns `None` if the path no longer
+    /// exists, or `Some(birth_time)` (`None` inside if unknown). A path born at or after
+    /// `window_start` is `created`; any other existing path is `modified`; a missing path
+    /// is `removed`. Transient files therefore show as `removed` on such platforms.
+    pub fn finish_by_state(
+        self,
+        window_start: SystemTime,
+        state: impl Fn(&Path) -> Option<Option<SystemTime>>,
+    ) -> Vec<(PathBuf, ChangeKind)> {
+        self.paths
+            .into_iter()
+            .filter(|(_, t)| t.touched)
+            .map(|(p, _)| {
+                let kind = match state(&p) {
+                    None => ChangeKind::Removed,
+                    Some(Some(born)) if born >= window_start => ChangeKind::Created,
+                    Some(_) => ChangeKind::Modified,
+                };
+
+                (p, kind)
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -162,6 +190,34 @@ mod tests {
         assert_eq!(
             run(vec![Raw::Removed(p("a")), Raw::Created(p("a"))]),
             vec![(p("a"), ChangeKind::Modified)]
+        );
+    }
+
+    #[test]
+    fn state_based_resolution() {
+        use std::time::Duration;
+
+        let start = SystemTime::UNIX_EPOCH + Duration::from_secs(1000);
+        let mut b = Batch::default();
+
+        // Event kinds are deliberately misleading, as FSEvents can be
+        for name in ["new", "old", "gone"] {
+            b.push(Raw::Created(p(name)));
+        }
+
+        let changes = b.finish_by_state(start, |path| match path.to_str() {
+            Some("new") => Some(Some(start + Duration::from_secs(1))),
+            Some("old") => Some(Some(start - Duration::from_secs(60))),
+            _ => None,
+        });
+
+        assert_eq!(
+            changes,
+            vec![
+                (p("gone"), ChangeKind::Removed),
+                (p("new"), ChangeKind::Created),
+                (p("old"), ChangeKind::Modified)
+            ]
         );
     }
 
