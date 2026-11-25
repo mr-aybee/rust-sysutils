@@ -5,29 +5,37 @@
 //! largest files are tracked in bounded per-directory lists merged upward. Memory
 //! therefore grows with the number of directories, not files.
 
-use crate::glob::Pattern;
-use rayon::prelude::*;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::fs::{self, Metadata};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use rayon::prelude::*;
+use serde::Serialize;
+
+use crate::glob::Pattern;
+
 /// Maximum number of individual error messages retained (all are counted).
 pub const MAX_ERRORS_KEPT: usize = 100;
 
+/// Scan settings.
 #[derive(Debug, Clone)]
 pub struct Options {
+    /// Do not descend into other filesystems (Unix).
     pub one_file_system: bool,
+    /// Entries to skip.
     pub exclude: Vec<Pattern>,
+    /// Number of largest files to keep.
     pub top_files: usize,
     /// Rank files and directories by logical (apparent) size instead of allocated.
     pub apparent: bool,
 }
 
+/// Aggregated usage of one directory and everything below it.
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 pub struct DirNode {
+    /// Directory name (the root's display path for the root).
     pub name: String,
     /// Path relative to the scan root, `/`-separated ("" for the root).
     pub path: String,
@@ -35,13 +43,17 @@ pub struct DirNode {
     pub logical: u64,
     /// Bytes allocated on disk (equal to `logical` where the OS does not report blocks).
     pub allocated: u64,
+    /// Files below this directory (hard links counted once).
     pub files: u64,
+    /// Directories below this directory.
     pub dirs: u64,
+    /// Subdirectories, largest first.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<DirNode>,
 }
 
 impl DirNode {
+    /// Size by the chosen metric: apparent if `apparent`, otherwise on disk.
     pub fn size(&self, apparent: bool) -> u64 {
         if apparent {
             self.logical
@@ -51,10 +63,14 @@ impl DirNode {
     }
 }
 
+/// One of the largest files.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct FileEntry {
+    /// Path relative to the scan root, `/`-separated.
     pub path: String,
+    /// Apparent size in bytes.
     pub logical: u64,
+    /// Bytes allocated on disk.
     pub allocated: u64,
 }
 
@@ -68,24 +84,34 @@ impl FileEntry {
     }
 }
 
+/// Complete result of a scan.
 #[derive(Debug, Serialize)]
 pub struct ScanResult {
+    /// Root of the directory tree.
     pub root: DirNode,
+    /// Largest files by the chosen metric, largest first.
     pub largest_files: Vec<FileEntry>,
+    /// Entries that could not be read.
     pub errors: u64,
+    /// The first read errors (at most `MAX_ERRORS_KEPT`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub error_samples: Vec<ScanError>,
     /// Files skipped because another link to the same inode was already counted.
     pub hardlinks_deduplicated: u64,
+    /// Symbolic links counted but not followed.
     pub symlinks_skipped: u64,
+    /// Entries skipped by `--exclude`.
     pub excluded: u64,
     /// Whether allocated sizes come from the OS (false on Windows: allocated = logical).
     pub allocated_supported: bool,
 }
 
+/// An entry that could not be read.
 #[derive(Debug, Clone, Serialize)]
 pub struct ScanError {
+    /// Path that failed.
     pub path: String,
+    /// Error message from the OS.
     pub error: String,
 }
 
@@ -103,6 +129,7 @@ struct Ctx<'a> {
 impl Ctx<'_> {
     fn error(&self, path: &Path, e: &std::io::Error) {
         self.errors.fetch_add(1, Ordering::Relaxed);
+
         if let Ok(mut v) = self.error_samples.lock()
             && v.len() < MAX_ERRORS_KEPT
         {
@@ -157,6 +184,7 @@ fn join_rel(parent: &str, name: &str) -> String {
 /// Merge `b` into `a`, keeping the `n` largest by the chosen metric.
 fn merge_top(a: &mut Vec<FileEntry>, mut b: Vec<FileEntry>, n: usize, apparent: bool) {
     a.append(&mut b);
+
     if a.len() > n {
         a.select_nth_unstable_by(n, |x, y| y.key(apparent).cmp(&x.key(apparent)));
         a.truncate(n);
@@ -184,6 +212,7 @@ fn scan_dir(
         ..Default::default()
     };
     let mut top: Vec<FileEntry> = Vec::new();
+
     let entries = match fs::read_dir(path) {
         Ok(e) => e,
         Err(e) => {
@@ -191,8 +220,10 @@ fn scan_dir(
             return (node, top);
         }
     };
+
     let mut subdirs: Vec<(PathBuf, String, String, Metadata)> = Vec::new();
     let n = ctx.opts.top_files;
+
     for entry in entries {
         let entry = match entry {
             Ok(e) => e,
@@ -201,6 +232,7 @@ fn scan_dir(
                 continue;
             }
         };
+
         let child_path = entry.path();
         let fname = entry.file_name().to_string_lossy().into_owned();
         let child_rel = join_rel(&node.path, &fname);
@@ -208,6 +240,7 @@ fn scan_dir(
             ctx.excluded.fetch_add(1, Ordering::Relaxed);
             continue;
         }
+
         // DirEntry::metadata does not follow symlinks.
         let m = match entry.metadata() {
             Ok(m) => m,
@@ -216,14 +249,17 @@ fn scan_dir(
                 continue;
             }
         };
+
         let ft = m.file_type();
         if ft.is_symlink() {
             // Never followed; the link itself is counted (like du), but not as a file.
             ctx.symlinks.fetch_add(1, Ordering::Relaxed);
             node.logical += m.len();
             node.allocated += platform::allocated(&m);
+
             continue;
         }
+
         if ft.is_dir() {
             if ctx.opts.one_file_system
                 && ctx.root_dev.is_some()
@@ -231,9 +267,12 @@ fn scan_dir(
             {
                 continue;
             }
+
             subdirs.push((child_path, fname, child_rel, m));
+
             continue;
         }
+
         // Regular files and special files (their metadata size is usually 0).
         if let Some(id) = platform::hardlink_id(&m) {
             let fresh = ctx
@@ -241,21 +280,25 @@ fn scan_dir(
                 .lock()
                 .map(|mut s| s.insert(id))
                 .unwrap_or(true);
+
             if !fresh {
                 ctx.hardlinks.fetch_add(1, Ordering::Relaxed);
                 continue;
             }
         }
+
         let (logical, allocated) = (m.len(), platform::allocated(&m));
         node.logical += logical;
         node.allocated += allocated;
         node.files += 1;
+
         if n > 0 {
             let key = if ctx.opts.apparent {
                 logical
             } else {
                 allocated
             };
+
             // Only build the path string for files that can enter the list.
             let qualifies = top.len() < n * 2 || top.iter().any(|f| f.key(ctx.opts.apparent) < key);
             if qualifies {
@@ -264,6 +307,7 @@ fn scan_dir(
                     logical,
                     allocated,
                 });
+
                 if top.len() >= n * 2 {
                     merge_top(&mut top, Vec::new(), n, ctx.opts.apparent);
                 }
@@ -275,6 +319,7 @@ fn scan_dir(
         .into_par_iter()
         .map(|(p, name, rel, m)| scan_dir(&p, name, rel, &m, ctx))
         .collect();
+
     for (child, child_top) in results {
         node.logical += child.logical;
         node.allocated += child.allocated;
@@ -283,6 +328,7 @@ fn scan_dir(
         node.children.push(child);
         merge_top(&mut top, child_top, n, ctx.opts.apparent);
     }
+
     merge_top(&mut top, Vec::new(), n, ctx.opts.apparent);
     (node, top)
 }
@@ -291,12 +337,14 @@ fn scan_dir(
 pub fn scan(root: &Path, opts: &Options) -> Result<ScanResult, String> {
     let meta =
         fs::symlink_metadata(root).map_err(|e| format!("cannot access {}: {e}", root.display()))?;
+
     let meta = if meta.file_type().is_symlink() {
         // An explicitly named symlink to a directory is followed (like `du dir/`).
         fs::metadata(root).map_err(|e| format!("cannot access {}: {e}", root.display()))?
     } else {
         meta
     };
+
     let ctx = Ctx {
         opts,
         root_dev: platform::dev(&meta),
@@ -308,6 +356,7 @@ pub fn scan(root: &Path, opts: &Options) -> Result<ScanResult, String> {
         excluded: AtomicU64::new(0),
     };
     let display = root.display().to_string();
+
     let (root_node, mut top) = if meta.is_dir() {
         scan_dir(root, display, String::new(), &meta, &ctx)
     } else {
@@ -325,6 +374,7 @@ pub fn scan(root: &Path, opts: &Options) -> Result<ScanResult, String> {
         };
         (node, vec![f])
     };
+
     top.sort_by(|a, b| {
         b.key(opts.apparent)
             .cmp(&a.key(opts.apparent))
@@ -352,6 +402,7 @@ fn sort_tree(node: &mut DirNode, apparent: bool) {
             .cmp(&a.size(apparent))
             .then_with(|| a.name.cmp(&b.name))
     });
+
     for c in &mut node.children {
         sort_tree(c, apparent);
     }
@@ -363,6 +414,7 @@ pub fn prune(node: &mut DirNode, depth: usize) {
         node.children.clear();
         return;
     }
+
     for c in &mut node.children {
         prune(c, depth - 1);
     }
@@ -387,13 +439,16 @@ mod tests {
         fs::create_dir_all(t.path().join("a/b")).unwrap();
         fs::write(t.path().join("a/b/big"), vec![0u8; 50_000]).unwrap();
         fs::write(t.path().join("a/mid"), vec![0u8; 20_000]).unwrap();
+
         for i in 0..10 {
             fs::write(t.path().join(format!("s{i}")), vec![0u8; 100 + i]).unwrap();
         }
+
         let r = scan(t.path(), &opts()).unwrap();
         assert_eq!(r.root.files, 12);
         assert_eq!(r.root.dirs, 2);
         let files_logical: u64 = 50_000 + 20_000 + (0..10).map(|i| 100 + i).sum::<u64>();
+
         // Root logical includes directory entry sizes too.
         assert!(r.root.logical >= files_logical);
         let paths: Vec<&str> = r.largest_files.iter().map(|f| f.path.as_str()).collect();

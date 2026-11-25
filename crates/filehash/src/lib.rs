@@ -7,8 +7,10 @@ pub mod walk;
 
 /// Process exit statuses.
 pub mod exit {
+    /// Everything succeeded.
     pub const OK: u8 = 0;
     /// Mismatch, missing file or read error.
     pub const FAILURE: u8 = 1;
+    /// Invalid usage or an unreadable/malformed manifest.
     pub const USAGE: u8 = 2;
 }

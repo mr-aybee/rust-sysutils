@@ -6,9 +6,12 @@
 
 use crate::algo::Algorithm;
 
+/// One manifest line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// File path as written in the manifest (unescaped).
     pub path: String,
+    /// Expected digest, lower-case hex.
     pub hex: String,
     /// Algorithm named by the line itself (BSD tag format only).
     pub algorithm: Option<Algorithm>,
@@ -18,7 +21,9 @@ fn escape(path: &str) -> (bool, String) {
     if !path.contains(['\\', '\n', '\r']) {
         return (false, path.to_string());
     }
+
     let mut out = String::with_capacity(path.len() + 4);
+
     for c in path.chars() {
         match c {
             '\\' => out.push_str("\\\\"),
@@ -27,6 +32,7 @@ fn escape(path: &str) -> (bool, String) {
             c => out.push(c),
         }
     }
+
     (true, out)
 }
 
@@ -38,6 +44,7 @@ fn unescape(s: &str) -> Result<String, String> {
             out.push(c);
             continue;
         }
+
         match chars.next() {
             Some('\\') => out.push('\\'),
             Some('n') => out.push('\n'),
@@ -50,6 +57,7 @@ fn unescape(s: &str) -> Result<String, String> {
             }
         }
     }
+
     Ok(out)
 }
 
@@ -57,6 +65,7 @@ fn unescape(s: &str) -> Result<String, String> {
 pub fn format_line(algo: Algorithm, hex: &str, path: &str, bsd_tag: bool) -> String {
     let (escaped, p) = escape(path);
     let prefix = if escaped { "\\" } else { "" };
+
     if bsd_tag {
         format!("{prefix}{} ({p}) = {hex}", algo.tag())
     } else {
@@ -74,6 +83,7 @@ pub fn parse_line(line: &str) -> Result<Entry, String> {
         Some(rest) => (true, rest),
         None => (false, line),
     };
+
     let unesc = |p: &str| {
         if escaped {
             unescape(p)
@@ -96,18 +106,22 @@ pub fn parse_line(line: &str) -> Result<Entry, String> {
             algorithm: Some(algo),
         });
     }
+
     // GNU: hex, space, (space | '*'), path
     let (hex, rest) = line.split_once(' ').ok_or("expected '<hex>  <path>'")?;
     if !is_hex(hex) {
         return Err("digest is not hexadecimal".into());
     }
+
     let path = rest
         .strip_prefix(' ')
         .or_else(|| rest.strip_prefix('*'))
         .ok_or("expected two spaces or ' *' after the digest")?;
+
     if path.is_empty() {
         return Err("missing path".into());
     }
+
     Ok(Entry {
         path: unesc(path)?,
         hex: hex.to_ascii_lowercase(),
@@ -118,16 +132,20 @@ pub fn parse_line(line: &str) -> Result<Entry, String> {
 /// Parse a whole manifest. Blank lines and lines starting with `#` are ignored.
 pub fn parse(text: &str) -> Result<Vec<Entry>, String> {
     let mut out = Vec::new();
+
     for (i, raw) in text.lines().enumerate() {
         let line = raw.strip_suffix('\r').unwrap_or(raw);
         if line.trim().is_empty() || line.starts_with('#') {
             continue;
         }
+
         out.push(parse_line(line).map_err(|e| format!("line {}: {e}", i + 1))?);
     }
+
     if out.is_empty() {
         return Err("manifest contains no entries".into());
     }
+
     Ok(out)
 }
 
@@ -140,21 +158,26 @@ pub fn infer_algorithm(
     if let Some(a) = explicit {
         return Ok(a);
     }
+
     let name = manifest_name.to_ascii_lowercase();
     if name.contains("b3") || name.contains("blake3") {
         return Ok(Algorithm::Blake3);
     }
+
     if name.contains("sha512") {
         return Ok(Algorithm::Sha512);
     }
+
     if name.contains("sha256") {
         return Ok(Algorithm::Sha256);
     }
+
     let lens: std::collections::BTreeSet<usize> = entries
         .iter()
         .filter(|e| e.algorithm.is_none())
         .map(|e| e.hex.len())
         .collect();
+
     match lens.into_iter().collect::<Vec<_>>().as_slice() {
         [] => Ok(Algorithm::Sha256), // all entries are tagged; value unused
         [128] => Ok(Algorithm::Sha512),
@@ -212,6 +235,7 @@ mod tests {
         ] {
             assert!(parse_line(bad).is_err(), "{bad:?}");
         }
+
         assert!(parse("# only comment\n").is_err());
     }
 
