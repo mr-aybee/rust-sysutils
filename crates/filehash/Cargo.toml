@@ -1,0 +1,34 @@
+[package]
+name = "filehash"
+version = "0.1.0"
+description = "Parallel file hashing (SHA-256, SHA-512, BLAKE3) and manifest verification compatible with sha256sum and b3sum"
+readme = "README.md"
+keywords = ["hash", "checksum", "blake3", "sha256", "integrity"]
+categories = ["command-line-utilities", "filesystem", "cryptography"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+blake3 = { version = "1.8.7", features = ["rayon", "mmap"] }
+clap = { version = "4.6.10", features = ["derive"] }
+ring = "0.17.14"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
+predicates = "3.1.4"
+proptest = "1.12.0"
+serde_json = "1.0.154"
+tempfile = "3.27.0"
+
+[[bench]]
+name = "core"
+harness = false
