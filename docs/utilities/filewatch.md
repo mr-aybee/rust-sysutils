@@ -72,6 +72,13 @@ Within a batch, each path ends up with at most one change, based on whether it e
 
 Paths are shown relative to the watched root they belong to. Access-only events (reads) are ignored.
 
+**macOS.** FSEvents accumulates event flags per path and can replay events from just before the watch started, so the kind of event cannot be trusted there. On macOS, each changed path is resolved from the filesystem's state at the end of the batch:
+- missing → `removed`;
+- exists and was born within the batch window (allowing 250 ms for FSEvents latency) → `created`;
+- otherwise → `modified`.
+
+One consequence: a transient file (created and removed within a batch) shows up as `removed` on macOS, where Linux and Windows drop it. Events for a watched root itself are ignored on every platform.
+
 ## Running commands
 
 - **No shell.** `argv` is executed as given.
@@ -120,6 +127,7 @@ Large trees on Linux may need a higher `fs.inotify.max_user_watches`. CI builds 
 - On network filesystems (NFS, SMB), events from other machines are usually not delivered. That's an OS limitation; there is no polling fallback yet.
 - Moving a directory *into* the watched tree reports the directory itself, not each file inside it.
 - `--restart` kills only the direct child process, not the processes it spawned.
+- macOS: transient files are reported as `removed` (see above).
 
 ## How it works
 

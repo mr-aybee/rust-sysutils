@@ -13,4 +13,5 @@ All notable changes to this crate are documented here. The format follows
 - Text or JSON Lines output.
 - Command execution after `--`, run directly (never through a shell), with changed paths on stdin and `FILEWATCH_CHANGED` in the environment. Runs never overlap: changes during a run are queued into one follow-up run, or the run is killed and restarted with `--restart`.
 - `--run-on-start` and `--once`.
+- macOS: changes are resolved from filesystem state (existence and birth time), because FSEvents flags accumulate; transient files show as `removed` there.
 - Kernel queue overflow is reported as an `overflow` event for the watched root and triggers the command; it is never dropped silently.
