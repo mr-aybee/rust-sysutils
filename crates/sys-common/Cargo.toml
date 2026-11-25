@@ -1,0 +1,16 @@
+[package]
+name = "sys-common"
+version = "0.1.0"
+description = "Private shared helpers for rust-sysutils binaries"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+proptest = "1.12.0"

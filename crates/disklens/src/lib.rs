@@ -1,5 +1,5 @@
 //! DiskLens: parallel disk usage analysis.
 
-pub mod glob;
+pub use sys_common::glob;
 pub mod render;
 pub mod scan;

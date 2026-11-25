@@ -398,6 +398,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "sys-common",
  "tempfile",
 ]
 
@@ -899,6 +900,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sys-common"
+version = "0.1.0"
+dependencies = [
+ "proptest",
 ]
 
 [[package]]
