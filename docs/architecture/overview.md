@@ -3,8 +3,10 @@
 ```text
 rust-sysutils/
 ├── crates/
+│   ├── sys-common/   private (publish = false): glob matching
 │   ├── filehash/     library + binary
-│   └── disklens/     library + binary
+│   ├── disklens/     library + binary
+│   └── filewatch/    library + binary
 ├── docs/             architecture, utility docs, benchmark reports
 └── scripts/          reproducible benchmark harnesses
 ```
@@ -31,3 +33,15 @@ Each utility is an independent crate with its own version, changelog, tests and 
 | Match GNU du conventions (directory apparent size 0, symlinks counted but not followed, hard links once) | Users can trust the numbers, and they are verified byte-identical on real trees. |
 | Deterministic sort (size, then name) after the parallel scan | Same output for any thread count, which is tested. |
 | Exit 1 on partial scans | Same as `du`, so scripts can detect incomplete totals. |
+
+## filewatch
+
+| Decision | Reason |
+|---|---|
+| `notify` crate for OS events | Maintained abstraction over inotify, FSEvents and ReadDirectoryChangesW, with overflow (rescan) signalling. |
+| Per-path existed-before / exists-after coalescing | One change per file per batch, even through editor temp-file and rename sequences; transient files vanish. |
+| Fixed debounce window opened by the first event | Bounded latency even under continuous event storms; a trailing debounce could postpone output indefinitely. |
+| Commands run without a shell, with paths on stdin | No injection through file names and no argument-length limits. |
+| One queued follow-up run, or `--restart` | Builds never overlap or pile up. |
+| Overflow becomes an explicit event plus a command run | Consumers can resynchronise; nothing is lost silently. |
+| Glob matcher moved to `sys-common` | Second user (disklens + filewatch). |
