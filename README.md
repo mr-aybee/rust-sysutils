@@ -18,8 +18,9 @@ rust-sysutils is a collection of single-purpose command-line tools for developer
 |---|---|---|
 | [**filehash**](docs/utilities/filehash.md) | ✅ 0.1.0 | Parallel hashing (SHA-256/512, BLAKE3) and manifest verification, compatible with `sha256sum`/`b3sum` |
 | [**disklens**](docs/utilities/disklens.md) | ✅ 0.1.0 | Parallel disk usage analysis: largest directories and files, `du`-identical totals |
+| [**filewatch**](docs/utilities/filewatch.md) | ✅ 0.1.0 | Watch files and run commands on change: debounced, shell-free, never overlapping |
 
-More utilities (filesystem watching, process inspection and others) will be added here only once they are implemented and tested.
+More utilities (process inspection, log rotation, file sync and others) will be added here only once they are implemented and tested.
 
 ## Key features
 
@@ -56,6 +57,7 @@ filehash hash -a blake3 /data -o data.b3         # BLAKE3, parallel
 filehash verify data.b3 --report-extra -q        # show only problems, incl. untracked files
 disklens / -x -d 2 -t 20                         # what is filling the root filesystem?
 disklens ~ -e node_modules -e .cache --json      # machine-readable usage report
+filewatch src -i '*.rs' -- cargo test            # rerun tests whenever sources change
 ```
 
 ## Use cases
@@ -64,10 +66,11 @@ disklens ~ -e node_modules -e .cache --json      # machine-readable usage report
 - **Backup and transfer integrity**: verify large datasets after copying, and find files added since the last run.
 - **CI drift checks**: fail a build when generated or vendored files change unexpectedly.
 - **Storage triage**: find what is filling a disk in seconds, with numbers that match `du`.
+- **Automation on change**: rebuild, reload configuration or ingest new files when they arrive, without shell-injection risks or overlapping runs.
 
 ## Performance
 
-Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [filehash](docs/benchmarks/filehash.md), [disklens](docs/benchmarks/disklens.md).
+Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [filehash](docs/benchmarks/filehash.md), [disklens](docs/benchmarks/disklens.md), [filewatch](docs/benchmarks/filewatch.md).
 
 | Workload | Reference | Result |
 |---|---|---|
@@ -77,6 +80,7 @@ Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [filehash]
 | disklens: 100,000 files, warm | `du -s` 505 ms | 57 ms |
 | disklens: 100,000 files, cold cache | `du -s` 2.99 s | 0.40 s |
 | disklens: `/usr`, 131k files | `du -sx` 1.02 s | 0.14 s, 12.8 MiB RSS |
+| filewatch: 5,000 file creates at 1,000/s | — | 0 lost, p95 delivery 0.33 ms |
 
 ## Architecture
 
